@@ -1,22 +1,40 @@
 import os
 
-from cs50 import SQL
+
 from flask import Flask, flash, jsonify, redirect, render_template, request, session
 from flask_session import Session
 #from tempfile import mkdtemp
 #from werkzeug.exceptions import default_exceptions, HTTPException, InternalServerError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from functions import login_required
+#from functions import login_required
+from flask_sqlalchemy import SQLAlchemy
 
+#from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+
+from datetime import timedelta
 # Configure application
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+#app.secret_key = os.urandom(24)
+app.config['SECRET_KEY'] = "This_is_the_seeeecccccreeet_thingzmagingz"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Ensure templates are auto-reloaded
-app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
+db = SQLAlchemy(app)
 
-db = SQL("sqlite:///mun.db")
+#Session(app)
+#login_manager.init_app(app)
+
+app.permanent_session_lifetime = timedelta(days=1)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(80))
+    hand_up = db.Column(db.String(80))
+    raise_up = db.Column(db.String(80))
+
+
 
 # Ensure responses aren't cached
 @app.after_request
@@ -26,8 +44,8 @@ def after_request(response):
     response.headers["Pragma"] = "no-cache"
     return response
 
-#FOR VOTE HTML
-# <meta http-equiv="refresh" content="5" >
+
+
 
 amt = 0
 
@@ -50,14 +68,35 @@ number_hand = []
 country_hand = []
 type_hand = []
 
-@app.route("/voting", methods=["GET", "POST"])
-@login_required
+extra_count = []
+extra_vote = []
 
+sigh = [1, 2]
+
+tli = []
+
+#x = False
+
+
+
+@app.route("/voting", methods=["GET", "POST"])
+#@login_required
 def voting():
 
+    global amt
+    global forr
+    global agains
+    global obstain
     global counter
     global counter1
     global counter2
+    global final_count
+    global final_vote
+    global countries
+    global number_track
+    global number_hand
+    global country_hand
+    global type_hand
 
 
     options = ["In Favor", "Abstention", "Against"]
@@ -70,131 +109,169 @@ def voting():
 
         vote = request.form.get("vote")
 
-        first_country = db.execute("SELECT username FROM accounts WHERE id = :user_id", user_id = session["user_id"])
-        country = first_country[0]["username"]
+        s = vote
 
-        global countries
+        the_current_user = session["user_id"]
+
+        acountry = User.query.filter_by(id=the_current_user).first()
+        country = acountry.username
 
         #countries[country] = vote
 
-        inside = False
+        acountry.raise_up = vote
+        db.session.commit()
 
-        """
-
-        for items in countries:
-            for things in final_count:
-                if things == items:
-                    inside = True
-                    break
-            else:
-                inside = False
-                final_count.append(items)
-
-        if inside == False:
-            for items in countries.values():
-                final_vote.append(items)
-        """
-
-        #print(countries)
-        #print("!!!!!")
-        #print(country)
-        #print("!!!!!")
-
-        for items in countries:
-            if str(items) == str(country):
-                x = countries.index(country)
-                earlier_vote = final_vote[x]
-                final_vote[x] = vote
-                inside = True
-
-        if inside == False:
-            countries.append(country)
-
-        if inside == True:
-            if earlier_vote == "In Favor":
-                counter.pop()
-            elif earlier_vote == "Abstention":
-                counter1.pop()
-            elif earlier_vote == "Against":
-                counter2.pop()
-            if vote == "In Favor":
-                counter.append("a")
-            elif vote == "Abstention":
-                counter1.append("a")
-            elif vote == "Against":
-                counter2.append("a")
-
-
-
-
-        if inside == False:
-            final_count.append(country)
-            final_vote.append(vote)
-
-            #print(countries)
-
-                #for items in countries.values():
-                 #   final_vote.append(items)s
-
-            global amt
-            global forr
-            global agains
-            global obstain
-            global type_hand
-            global country_hand
-            global number_track
-
-            amt = len(final_vote)
-
-
-            if vote == "In Favor":
-                counter.append("a")
-            elif vote == "Abstention":
-                counter1.append("a")
-            elif vote == "Against":
-                counter2.append("a")
-
-        forr = len(counter)
-        agains = len(counter2)
-        obstain = len(counter1)
 
         return redirect("/")
+
+
+@app.route("/transfer_page", methods=["GET", "POST"])
+def transf():
+
+    options = ["In Favor", "Abstention", "Against"]
+
+
+    if request.method == "POST":
+        the_current_user = session["user_id"]
+        acountry = User.query.filter_by(id=the_current_user).first()
+        country = acountry.hand_up
+
+
+
+
+        return redirect("/")
+    else:
+        return render_template("voting.html", counter = counter, counter1 = counter1, counter2 = counter2, options = options)
+
+
+
 @app.route("/", methods=["GET", "POST"])
-@login_required
 def vot():
 
+    global country_hand
+    global country_raise
+    global final_count
+    global final_vote
+    global counter
+    global counter1
+    global counter2
     global forr
     global agains
-    global obstain
-    global type_hand
-    global country_hand
-    global number_track
+    global amt
+
+    final_count = []
+    final_vote = []
+    country_hand = []
+    type_hand = []
+    counter = []
+    counter1 = []
+    counter2 = []
+
+
+
+    for i in User.query.filter_by(raise_up="In Favor").all():
+        final_count.append(i.username)
+        final_vote.append("In Favor")
+        counter.append("a")
+    for i in User.query.filter_by(raise_up="Abstention").all():
+        final_count.append(i.username)
+        final_vote.append("Abstention")
+        counter1.append("a")
+    for i in User.query.filter_by(raise_up="Against").all():
+        final_count.append(i.username)
+        final_vote.append("Against")
+        counter2.append("a")
+
+    forr = len(counter)
+    agains = len(counter2)
+    obstain = len(counter1)
+    amt = len(final_vote)
+
+    for i in User.query.filter_by(hand_up="Point of Information(POI)").all():
+        country_hand.append(i.username)
+        type_hand.append("Point of Information")
+    for i in User.query.filter_by(hand_up="Speech").all():
+        country_hand.append(i.username)
+        type_hand.append("Speech")
+    for i in User.query.filter_by(hand_up="Amendment").all():
+        country_hand.append(i.username)
+        type_hand.append("Amendment")
+    for i in User.query.filter_by(hand_up="Amendment to the Second Degree").all():
+        country_hand.append(i.username)
+        type_hand.append("Amendment To The Second Degree")
+
+    number_track = len(country_hand)
+
+
 
 
     return render_template("vote.html", final_count = final_count, final_vote = final_vote, amt = amt, forr = forr, obstain = obstain, agains = agains, country_hand = country_hand, type_hand = type_hand, number_track = number_track)
 
+
+
 @app.route("/c", methods=["GET", "POST"])
-@login_required
 def ccc():
+    global country_hand
+    global country_raise
+    global final_count
+    global final_vote
+    global counter
+    global counter1
+    global counter2
     global forr
     global agains
-    global obstain
-    global type_hand
-    global country_hand
-    global number_track
+    global amt
+
+    final_count = []
+    final_vote = []
+    country_hand = []
+    type_hand = []
+    counter = []
+    counter1 = []
+    counter2 = []
+
+    if session["user_id"] != None:
+
+        for i in User.query.filter_by(raise_up="In Favor").all():
+            final_count.append(i.username)
+            final_vote.append("In Favor")
+            counter.append("a")
+        for i in User.query.filter_by(raise_up="Abstention").all():
+            final_count.append(i.username)
+            final_vote.append("Abstention")
+            counter1.append("a")
+        for i in User.query.filter_by(raise_up="Against").all():
+            final_count.append(i.username)
+            final_vote.append("Against")
+            counter2.append("a")
+
+        forr = len(counter)
+        agains = len(counter2)
+        obstain = len(counter1)
+        amt = len(final_vote)
+
+        for i in User.query.filter_by(hand_up="Point of Information(POI)").all():
+            country_hand.append(i.username)
+            type_hand.append("Point of Information")
+        for i in User.query.filter_by(hand_up="Speech").all():
+            country_hand.append(i.username)
+            type_hand.append("Speech")
+        for i in User.query.filter_by(hand_up="Amendment").all():
+            country_hand.append(i.username)
+            type_hand.append("Amendment")
+        for i in User.query.filter_by(hand_up="Amendment to the Second Degree").all():
+            country_hand.append(i.username)
+            type_hand.append("Amendment To The Second Degree")
+
+        number_track = len(country_hand)
 
 
-    return render_template("chair.html", final_count = final_count, final_vote = final_vote, amt = amt, forr = forr, obstain = obstain, agains = agains, country_hand = country_hand, type_hand = type_hand, number_track = number_track)
-
-
-
+        return render_template("chair.html", final_count = final_count, final_vote = final_vote, amt = amt, forr = forr, obstain = obstain, agains = agains, country_hand = country_hand, type_hand = type_hand, number_track = number_track)
+    else:
+        return render_template("login.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
-
-
-
 
 
 
@@ -205,8 +282,13 @@ def login():
     session.clear()
 
     if request.method == "GET":
-        return render_template("login.html")
+        #print(generate_password_hash("33hello45"))
 
+        #new_user = User(id = 21, username = "Austria", password = "33Austria45")
+        #db.session.add(new_user)
+        #db.session.commit()
+
+        return render_template("login.html")
 
 
     # User reached route via POST (as by submitting a form via POST)
@@ -224,9 +306,22 @@ def login():
         elif not request.form.get("password"):
             return render_template("login.html")
 
+        gg = request.form.get("username")
+
+        aa = request.form.get("password")
+
+
+
+
         # Query database for username
-        rows = db.execute("SELECT * FROM accounts WHERE username = :username",
-                          username=request.form.get("username"))
+        rows = User.query.filter_by(username=gg).first()
+        if rows == None:
+
+            return render_template("login.html")
+
+
+
+
         #print(rows)
 
         # Ensure username exists and password is correct
@@ -237,58 +332,76 @@ def login():
         #    return redirect("/login")
         # Ensure username exists and password is correct
         #y = check_password_hash(rows[0]["password"], request.form.get("password"))
-        if len(rows) != 1 or not check_password_hash(rows[0]["password"], request.form.get("password")):
-            return render_template("login.html")
+        if (str(rows.password) == str(aa)):
+
+            session["user_id"] = rows.id
+
+            if rows.username == "Chair":
+                return redirect("/c")
+            else:
+                return redirect("/")
+
+
+
+        return render_template("login.html")
+
+
+
+
+        #if rows != "shouldnotbethis" or not check_password_hash(rows[0]["password"], request.form.get("password")):
+        #    return render_template("login.html")
 
         #if rows[0]["password"] != request.form.get("password")):
            # return apology("invalid", 403)
 
         # Remember which user has logged in
-        session["user_id"] = rows[0]["id"]
 
-        before_country_raise = db.execute("SELECT username FROM accounts WHERE id = :user_id", user_id = session["user_id"])
-        current_country = before_country_raise[0]["username"]
-
-        if current_country == "Chair":
-            return redirect("/c")
-        else:
-            return redirect("/")
 
 
 
 
 @app.route("/chair", methods=["GET", "POST"])
+#@login_required
 def chair():
     if request.method == "POST":
+        global final_count
+        global final_vote
         global counter
         global counter1
         global counter2
-        global final_count
-        global final_vote
-        global agains
         global forr
-        global obstain
+        global agains
         global amt
-        global countries
+
+        final_count = []
+        final_vote = []
+        country_hand = []
+        type_hand = []
         counter = []
         counter1 = []
         counter2 = []
-        final_count = []
-        final_vote = []
-        countries = []
-        amt = 0
-        forr = 0
-        agains = 0
-        obstain = 0
+
+        for i in User.query.filter_by(raise_up="In Favor").all():
+            i.raise_up = "Nothing"
+            db.session.commit()
+        for i in User.query.filter_by(raise_up="Abstention").all():
+            i.raise_up = "Nothing"
+            db.session.commit()
+        for i in User.query.filter_by(raise_up="Against").all():
+            i.raise_up = "Nothing"
+            db.session.commit()
+
         return redirect("/c")
 
 
 @app.route("/quickrefresh", methods=["GET", "POST"])
+#@login_required
 def refresh():
     if request.method == "POST":
         return redirect("/c")
 
 @app.route("/raise", methods=["GET", "POST"])
+#@login_required
 def raise_hand():
     if request.method == "GET":
         return render_template("raise.html")
@@ -296,63 +409,117 @@ def raise_hand():
         global type_hand
         global country_hand
         global number_track
+        global final_count
         isit = False
         reason = request.form.get("raise_type")
-        before_country_raise = db.execute("SELECT username FROM accounts WHERE id = :user_id", user_id = session["user_id"])
-        country_raise = before_country_raise[0]["username"]
+        curent_user = session["user_id"]
+        before = User.query.filter_by(id=curent_user).first()
+        country_raise = before.username
 
 
-
+        """
         for items in country_hand:
             if str(items) == str(country_raise):
-                x = country_hand.index(country_raise)
-                earlier_raise = type_hand[x]
-                type_hand[x] = reason
+                l = country_hand.index(country_raise)
+                type_hand[l] = reason
                 isit = True
+                print(f"No hand {country_hand}")
+                print(f"No hand {type_hand}")
+                print(f"No hand {final_count}")
+                print(f"No hand {final_vote}")
+
+        """
+        before.hand_up = reason
+        db.session.commit()
 
 
-        if isit == False:
-            country_hand.append(country_raise)
-            type_hand.append(reason)
-        number_track = len(country_hand)
+
         return redirect("/")
+
+
+
+
 
 @app.route("/quickraise", methods=["GET", "POST"])
 def quick_raise():
     if request.method == "POST":
-        global type_hand
-        global country_hand
-        global number_track
 
         #sure = False
-        before_country_raise = db.execute("SELECT username FROM accounts WHERE id = :user_id", user_id = session["user_id"])
-        current_count = before_country_raise[0]["username"]
+        #sure = False
+        the_user = session["user_id"]
+        before_country_raise = User.query.filter_by(id=the_user).first()
+        current_count = before_country_raise.username
+
+
+        if before_country_raise.hand_up != "Nothing":
+            before_country_raise.hand_up = "Nothing"
+            db.session.commit()
+
+            return redirect("/")
+
+        else:
+            return render_template("raise.html")
+
+
 
         for items in country_hand:
             if str(items) == str(current_count):
                 x = country_hand.index(current_count)
-                country_hand.pop(x)
+                country_hand.remove(current_count)
                 type_hand.pop(x)
+
                 return redirect("/")
 
 
         return render_template("raise.html")
 
-@app.route("/alldown", methods=["GET", "POST"])
-def quick_close():
+@app.route("/the_check", methods=["GET", "POST"])
+def lets_hope():
     if request.method == "POST":
-        global type_hand
         global country_hand
-        global number_track
-        number_track = 0
-        country_hand = []
-        type_hand = []
-        return redirect("/c")
+        global country_raise
+        global final_count
+        global final_vote
+
+        return render_template("raise.html")
+
+
+@app.route("/the_finish", methods=["GET", "POST"])
+def final_hope():
+    if request.method == "POST":
+        #country_hand.append("bye")
+        #type_hand.append("please")
+        global extra_count
+        global extra_vote
+
+        return render_template("vote.html", final_count = final_count, final_vote = final_vote, amt = amt, forr = forr, obstain = obstain, agains = agains, country_hand = country_hand, type_hand = type_hand, number_track = number_track)
 
 
 
+@app.route("/alldown", methods=["GET", "POST"])
+#@login_required
+def quick_close():
+    global type_hand
+    global country_hand
+    global number_track
+    global country_hand
+    global country_raise
 
+    country_hand = []
+    type_hand = []
 
+    for i in User.query.filter_by(hand_up="Point of Information(POI)").all():
+        i.hand_up = "Nothing"
+        db.session.commit()
+    for i in User.query.filter_by(hand_up="Speech").all():
+        i.hand_up = "Nothing"
+        db.session.commit()
+    for i in User.query.filter_by(hand_up="Amendment").all():
+        i.hand_up = "Nothing"
+        db.session.commit()
+    for i in User.query.filter_by(hand_up="Amendment to the Second Degree").all():
+        i.hand_up = "Nothing"
+        db.session.commit()
 
-
-
+    number_track = len(country_hand)
+    return redirect("/c")
